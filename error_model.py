@@ -173,7 +173,7 @@ def compute_language_model_prob(word, antecedent=None, after=None, \
 def correct_mistake(sentence, error, use_bigrams=False):
     """
     The assumption is that the error consists of letters only.
-    """rror)
+    """
 
     # some errors are listed with punctuation, capital letters
     # if an error consists of banned characters only an exception is raised
