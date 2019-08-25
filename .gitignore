@@ -1,2 +1,4 @@
 pickles/
 dataframes/
+jupyter_notebooks/brudnopis*.ipynb
+jupyter_notebooks/.ipynb_checkpoints/
