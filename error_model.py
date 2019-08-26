@@ -71,6 +71,7 @@ def clean_sentence(sentence):
     """
 
     sentence = sentence.replace("\\t", " ")
+    tokens = sentence.split()
     table = str.maketrans('', '', string.punctuation)
     tokens = [w.translate(table) for w in tokens]
     # remove remaining tokens that are not alphabetic
@@ -83,12 +84,16 @@ def compute_channel_model_prob(observed, candidate):
     Based on the count of two adjacent characters estimate conditional
     probability P(observed|candidate).
     """
+    # DEBUG:
+    print("###### Observation {} and candidate {} are considered ##########".format(observed, candidate))
 
     # get one of the four basic operations that are needed to turn the candidate
     # into the observation
     # nums refer to the index of letters that are vital for the
     # operation
     operation, *nums = get_basic_operations(candidate, observed)[0]
+    # DEBUG:
+    print("Operation is: {}".format(operation))
     # choose one of the matrices accordingly
     if operation == 'delete':
         # if the letter of interest is the first one
@@ -111,13 +116,19 @@ def compute_channel_model_prob(observed, candidate):
 
     # debugging
     try:
+        # DEBUG:
+        print("row: {}, col: {}".format(row, col))
+        print("Nominator is: {}".format(nominator))
+        print("Chars count is {}".format(chars_matrix[col][row]))
         return nominator / chars_matrix[col][row]
     except:
         print("Col: ", col)
         print("Row: ", row)
 
+# # DEBUG:
+# lambda_coef is 0.75 by default and not parametrised
 def compute_language_model_prob(word, antecedent=None, after=None, \
-                                    lambda_coef=0.75):
+                                    lambda_coef=float(sys.argv[1])):
 
     """
     Given a word compute a (by default) a unigram probability.
@@ -135,39 +146,79 @@ def compute_language_model_prob(word, antecedent=None, after=None, \
     # probability estimation
 
     if antecedent and after:
+        # DEBUG:
+        print("Word before is: {}".format(antecedent))
+        print("Word after is: {}".format(after))
         try:
             bigram_part = lambda_coef*two_gram_probs[antecedent][word]
+            # DEBUG:
+            print("Bigram1 prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
+            # DEBUG:
+            print("Bigram1 prob not found: {}".format(bigram_part))
 
         prob1 = bigram_part + (1-lambda_coef)*one_gram_dict_probs[antecedent]
+        # DEBUG:
+        print("Prob1: {}".format(prob1))
 
         try:
             bigram_part = lambda_coef*two_gram_probs[word][after]
+            # DEBUG:
+            print("Bigram2 prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
+            # DEBUG:
+            print("Bigram2 prob not found {}".format(bigram_part))
 
         prob2 = bigram_part + (1-lambda_coef)*one_gram_dict_probs[word]
+        # DEBUG:
+        print("Prob2: {}".format(prob2))
 
         prob = np.exp(np.log(prob1) + np.log(prob2))
+        # DEBUG:
+        print("Prob_lang_final: {}".format(prob))
 
     elif antecedent:
+        # DEBUG:
+        print("Word before is: {}".format(antecedent))
         try:
             bigram_part = lambda_coef*two_gram_probs[antecedent][word]
+            # DEBUG:
+            print("Bigram prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
+            # DEBUG:
+            print("Bigram prob not found: {}".format(bigram_part))
+
         prob =  bigram_part + (1-lambda_coef)*one_gram_dict_probs[antecedent]
+        # DEBUG:
+        print("Prob_lang_final: {}".format(prob))
 
     elif after:
+        # DEBUG:
+        print("Word after is: {}".format(after))
         try:
             bigram_part = lambda_coef*two_gram_probs[word][after]
+            # # DEBUG:
+            print("Bigram prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
+            # # DEBUG:
+            print("Bigram prob not found: {}".format(bigram_part))
+
         prob =  bigram_part + (1-lambda_coef)*one_gram_dict_probs[word]
+        # DEBUG:
+        print("Prob_lang_final: {}".format(prob))
 
     else:
         # unigram case
+        # # DEBUG:
+        print("Unigram case")
         prob = one_gram_dict_probs[word]
+        # DEBUG:
+        print("Prob_lang_final: {}".format(prob))
+
     return prob
 
 def correct_mistake(sentence, error, use_bigrams=False):
@@ -215,6 +266,8 @@ def correct_mistake(sentence, error, use_bigrams=False):
     # analysed sentence is at least two-word long
 
     if use_bigrams and len(clean_tokens) > 1:
+        # DEBUG:
+        print("Bigram mode")
         # Depending on the error's position in the sentence one of three
         # situations can occur:
         # 1. The error has an antecedent as well as a word after.
@@ -253,18 +306,42 @@ def correct_mistake(sentence, error, use_bigrams=False):
                                     antecedent=clean_tokens[error_location-1],
                                     after=clean_tokens[error_location+1])
 
-            error_model_prob = np.exp(np.log(error_model_prob) \
+        # DEBUG:
+        print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
+
+        # DEBUG:
+        print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
+
+        channel_model_prob = np.exp(np.log(error_model_prob) \
                                         + np.log(language_model_prob))
 
+        cand_probs[cand] = channel_model_prob
+        ## DEBUG:
+        print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
+
     else:
+        # DEBUG:
+        print("Unigram mode")
+        print("Probs are scaled 1000000")
         for cand, error_model_prob in cand_probs.items():
             try:
                 language_model_prob = one_gram_dict_probs[cand]
+                # DEBUG:
+                print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
             except NameError:
                 pass
 
-            error_model_prob = np.exp(np.log(error_model_prob) \
+            # error_model_prob = np.exp(np.log(error_model_prob) \
+            #                             + np.log(language_model_prob))
+
+            channel_model_prob = np.exp(np.log(error_model_prob) \
                                         + np.log(language_model_prob))
+            # DEBUG:
+            print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
+
+            cand_probs[cand] = channel_model_prob
+            ## DEBUG:
+            print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
 
     # return the candidate that has the highest probability
     # return max(cand_probs.items(), key=operator.itemgetter(1))[0]
@@ -273,6 +350,14 @@ def correct_mistake(sentence, error, use_bigrams=False):
     return most_likely_cand
 
 if __name__ == "__main__":
+    # single cases analyzer:
+    # sentence = 'KH2002 jest bronią samoczynno-samopowtarzalną działającą na zasadzie odprowadzania gazów prochowych rzez boczny otwór lufy, strzelającą z zamka zamkniętego.'
+    # error = 'rzez'
+    # print("The error is: {}".format(error))
+    # print("Sentence with error: {}".format(sentence))
+    # print(correct_mistake(sentence, error, use_bigrams=False))
+
+
     # import test dataset
     # test dataset is comprised of a dataframe
     with open('./pickles/test_train.dat', 'rb') as file:
@@ -319,5 +404,5 @@ if __name__ == "__main__":
     test_df['unigram_case'] = unigram_case_results
     test_df['bigram_case'] = bigram_case_results
 
-    file_to_save = 'test_set_with_answers' + '.csv'
+    file_to_save = 'test_set_with_answers_no_lang_error_scaling_{}_lambda'.format(str(sys.argv[1])) + '.csv'
     test_df.to_csv(file_to_save)
