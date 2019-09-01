@@ -27,6 +27,10 @@ import pprint
 pp = pprint.PrettyPrinter(indent=4)
 ############################
 
+######### store single-example rows in a list
+rows_list_uni = list()
+rows_list_bi = list()
+
 # get the set of valid words - according to one-gram model
 with open('./pickles/valid_words_set.p', 'rb') as file:
     valid_words = pickle.load(file)
@@ -93,6 +97,9 @@ def compute_channel_model_prob(observed, candidate):
     # operation
     operation, *nums = get_basic_operations(candidate, observed)[0]
     # DEBUG:
+    # uni_row.append(operation)
+    # bi_row.append(operation)
+    # DEBUG:
     print("Operation is: {}".format(operation))
     # choose one of the matrices accordingly
     if operation == 'delete':
@@ -120,7 +127,13 @@ def compute_channel_model_prob(observed, candidate):
         print("row: {}, col: {}".format(row, col))
         print("Nominator is: {}".format(nominator))
         print("Chars count is {}".format(chars_matrix[col][row]))
-        return nominator / chars_matrix[col][row]
+        # DEBUG:
+        # uni_row.append(nominator)
+        # uni_row.append(chars_matrix[col][row])
+        #
+        # bi_row.append(nominator)
+        # bi_row.append(chars_matrix[col][row])
+        return (nominator / chars_matrix[col][row], operation, nominator, chars_matrix[col][row])
     except:
         print("Col: ", col)
         print("Row: ", row)
@@ -259,9 +272,29 @@ def correct_mistake(sentence, error, use_bigrams=False):
         # error (channel) model is the same irrespective of the usage of bigrams
         # error is the observation
 
-        error_model_prob = compute_channel_model_prob(error, cand)
+        # DEBUG:
+        uni_row, bi_row = list(), list()
+        print("Rows initialised!")
+        uni_row.append(error)
+        bi_row.append(error)
+        uni_row.append(cand)
+        bi_row.append(cand)
+        print("CANDIDATE: ", cand)
+
+        error_model_prob = compute_channel_model_prob(error, cand)[0]
+        # DEBUG:
+        uni_row.append(compute_channel_model_prob(error, cand)[1]) #operatoin
+        uni_row.append(compute_channel_model_prob(error, cand)[2]) #nominator
+        uni_row.append(compute_channel_model_prob(error, cand)[3]) #denominator
+        bi_row.append(compute_channel_model_prob(error, cand)[1]) #operatoin
+        bi_row.append(compute_channel_model_prob(error, cand)[2]) #nominator
+        bi_row.append(compute_channel_model_prob(error, cand)[3]) #denominator
         cand_probs[cand] = error_model_prob
 
+        # DEBUG:
+        uni_row.append(error_model_prob)
+        bi_row.append(error_model_prob)
+        rows_list_bi.append(bi_row)
     # it may be the case that the sentence such as
     # ! '5: 254, 267 1877 - muszkatałowce'
     # will be transformed into 'muszkatałowce' and no bigram analysis
@@ -300,6 +333,9 @@ def correct_mistake(sentence, error, use_bigrams=False):
                 language_model_prob =\
                  compute_language_model_prob(cand,
                                 after=clean_tokens[error_location+1])
+                # DEBUG:
+                # bi_row.append(None) # ante
+                # bi_row.append(clean_tokens[error_location+1]) #after
 
             elif error_location == len(clean_tokens)-1:
                 # third case
@@ -308,6 +344,10 @@ def correct_mistake(sentence, error, use_bigrams=False):
                 language_model_prob =\
                  compute_language_model_prob(cand,
                                     antecedent=clean_tokens[error_location-1])
+
+                # DEBUG:
+                # bi_row.append(clean_tokens[error_location-1]) # ante
+                # bi_row.append(None) # after
 
             else:
                 # first case
@@ -318,19 +358,30 @@ def correct_mistake(sentence, error, use_bigrams=False):
                                     antecedent=clean_tokens[error_location-1],
                                     after=clean_tokens[error_location+1])
 
+                # DEBUG:
+                # bi_row.append(clean_tokens[error_location-1]) #ante
+                # bi_row.append(clean_tokens[error_location+1]) #after
+
             # DEBUG:
             print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
 
+            # DEBUG:
+            # bi_row.append(language_model_prob*1000000)
             # DEBUG:
             print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
 
             channel_model_prob = np.exp(np.log(error_model_prob) \
                                             + np.log(language_model_prob))
 
+            # bi_row.append(channel_model_prob*1000000)
+
             cand_probs[cand] = channel_model_prob
+            # DEBUG:
+
             ## DEBUG:
             print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
-
+            # print("Dołączam: ", bi_row[1])
+            # rows_list_bi.append(bi_row)
     else:
         # DEBUG:
         print("Unigram mode")
@@ -340,6 +391,9 @@ def correct_mistake(sentence, error, use_bigrams=False):
                 language_model_prob = one_gram_dict_probs[cand]
                 # DEBUG:
                 print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
+
+                # DEBUG:
+                uni_row.append(language_model_prob*1000000)
             except NameError:
                 pass
 
@@ -348,6 +402,10 @@ def correct_mistake(sentence, error, use_bigrams=False):
 
             channel_model_prob = np.exp(np.log(error_model_prob) \
                                         + np.log(language_model_prob))
+
+            # DEBUG:
+            uni_row.append(channel_model_prob*1000000)
+            rows_list_uni.append(uni_row)
             # DEBUG:
             print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
 
@@ -361,62 +419,68 @@ def correct_mistake(sentence, error, use_bigrams=False):
     most_likely_cand = max(cand_probs.items(), key=operator.itemgetter(1))[0]
     # DEBUG:
     print("The most likely candidate is: ", most_likely_cand)
+
     return most_likely_cand
 
 if __name__ == "__main__":
-    # # single cases analyzer:
-    # sentence = 'Pięciobój zimowy (odmiana Pięcioboju nowoczesnego, sport pokazowy) Skeleton (sport powacający do programu IO po 20 latach)'
-    # error = 'powacający'
-    # print("The error is: {}".format(error))
-    # print("Sentence with error: {}".format(sentence))
-    # print(correct_mistake(sentence, error, use_bigrams=True))
+    # single cases analyzer:
+    sentence = 'Pięciobój zimowy (odmiana Pięcioboju nowoczesnego, sport pokazowy) Skeleton (sport powacający do programu IO po 20 latach)'
+    error = 'powacający'
+    print("The error is: {}".format(error))
+    print("Sentence with error: {}".format(sentence))
+    print(correct_mistake(sentence, error, use_bigrams=True))
+
+    print("Uni_row: ", rows_list_uni)
+    print("Bi_row: ", rows_list_bi)
+
+    ### TODO: dać całą ramkę i później wybrać tam, gdzie op/chars < 1
 
 
-    # import test dataset
-    # test dataset is comprised of a dataframe
-    with open('./pickles/test_train.dat', 'rb') as file:
-        data = pickle.load(file)
-        test_df = data[1]
-        # gold standard is originally a pandas Series object
-        gold_standard = data[3]
-
-    # as is the case with raw errors gold standard entries must be transformed
-    # as well
-    test_df['gold_standard'] = gold_standard
-    test_df['gold_standard'] = test_df['gold_standard'].apply(lambda x: clean_sentence(x)[0])
-
-    print("Started unigram")
-
-    # empty list to hold unigram method predictions
-    unigram_case_results = []
-
-    # for loop for the purposes of debugging
-    for i in range(test_df.shape[0]):
-        sent_with_error = test_df.iloc[i]['text_with_error']
-        error = test_df.iloc[i]['error']
-        try:
-            result = correct_mistake(sent_with_error, error, use_bigrams=False)
-        except:
-            result = 'other_error'
-        unigram_case_results.append(result)
-
-    print("Started bigram")
-
-    bigram_case_results = []
-
-    for i in range(test_df.shape[0]):
-        sent_with_error = test_df.iloc[i]['text_with_error']
-        error = test_df.iloc[i]['error']
-        try:
-            # result = correct_mistake(sent_with_error, error, use_bigrams=True)
-            # debugging
-            result = correct_mistake(sent_with_error, error, use_bigrams=True)
-        except:
-            result = 'other_error'
-        bigram_case_results.append(result)
-
-    test_df['unigram_case'] = unigram_case_results
-    test_df['bigram_case'] = bigram_case_results
-
-    file_to_save = './results/test_set_with_answers_no_lang_error_scaling_{}_lambda'.format(str(sys.argv[1])) + '.csv'
-    test_df.to_csv(file_to_save)
+    # # import test dataset
+    # # test dataset is comprised of a dataframe
+    # with open('./pickles/test_train.dat', 'rb') as file:
+    #     data = pickle.load(file)
+    #     test_df = data[1]
+    #     # gold standard is originally a pandas Series object
+    #     gold_standard = data[3]
+    #
+    # # as is the case with raw errors gold standard entries must be transformed
+    # # as well
+    # test_df['gold_standard'] = gold_standard
+    # test_df['gold_standard'] = test_df['gold_standard'].apply(lambda x: clean_sentence(x)[0])
+    #
+    # print("Started unigram")
+    #
+    # # empty list to hold unigram method predictions
+    # unigram_case_results = []
+    #
+    # # for loop for the purposes of debugging
+    # for i in range(test_df.shape[0]):
+    #     sent_with_error = test_df.iloc[i]['text_with_error']
+    #     error = test_df.iloc[i]['error']
+    #     try:
+    #         result = correct_mistake(sent_with_error, error, use_bigrams=False)
+    #     except:
+    #         result = 'other_error'
+    #     unigram_case_results.append(result)
+    #
+    # print("Started bigram")
+    #
+    # bigram_case_results = []
+    #
+    # for i in range(test_df.shape[0]):
+    #     sent_with_error = test_df.iloc[i]['text_with_error']
+    #     error = test_df.iloc[i]['error']
+    #     try:
+    #         # result = correct_mistake(sent_with_error, error, use_bigrams=True)
+    #         # debugging
+    #         result = correct_mistake(sent_with_error, error, use_bigrams=True)
+    #     except:
+    #         result = 'other_error'
+    #     bigram_case_results.append(result)
+    #
+    # test_df['unigram_case'] = unigram_case_results
+    # test_df['bigram_case'] = bigram_case_results
+    #
+    # file_to_save = './results/test_set_with_answers_no_lang_error_scaling_{}_lambda'.format(str(sys.argv[1])) + '.csv'
+    # test_df.to_csv(file_to_save)
