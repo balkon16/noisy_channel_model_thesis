@@ -145,6 +145,9 @@ def compute_language_model_prob(word, antecedent=None, after=None, \
     # a weight that indicates importance of unigram model in bigram
     # probability estimation
 
+    # DEBUG:
+    print("#### I'm considering: {}".format(word))
+
     if antecedent and after:
         # DEBUG:
         print("Word before is: {}".format(antecedent))
@@ -284,40 +287,49 @@ def correct_mistake(sentence, error, use_bigrams=False):
         # handle imperfect data: error is not in the sentence
             error_location = clean_tokens.index(error)
         except ValueError:
+            print("ValueError!")
             return None
 
         for cand, error_model_prob in cand_probs.items():
+            # DEBUG:
+            print("<<<<This is the candidate (before language model): ", cand)
             if error_location == 0:
                 # second case
+                # DEBUG:
+                print("Second case")
                 language_model_prob =\
                  compute_language_model_prob(cand,
                                 after=clean_tokens[error_location+1])
 
             elif error_location == len(clean_tokens)-1:
                 # third case
+                # DEBUG:
+                print("Third case")
                 language_model_prob =\
                  compute_language_model_prob(cand,
                                     antecedent=clean_tokens[error_location-1])
 
             else:
                 # first case
+                # DEBUG:
+                print("First case")
                 language_model_prob = \
                     compute_language_model_prob(cand,
                                     antecedent=clean_tokens[error_location-1],
                                     after=clean_tokens[error_location+1])
 
-        # DEBUG:
-        print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
+            # DEBUG:
+            print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
 
-        # DEBUG:
-        print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
+            # DEBUG:
+            print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
 
-        channel_model_prob = np.exp(np.log(error_model_prob) \
-                                        + np.log(language_model_prob))
+            channel_model_prob = np.exp(np.log(error_model_prob) \
+                                            + np.log(language_model_prob))
 
-        cand_probs[cand] = channel_model_prob
-        ## DEBUG:
-        print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
+            cand_probs[cand] = channel_model_prob
+            ## DEBUG:
+            print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
 
     else:
         # DEBUG:
@@ -347,15 +359,17 @@ def correct_mistake(sentence, error, use_bigrams=False):
     # return max(cand_probs.items(), key=operator.itemgetter(1))[0]
     # debugging:
     most_likely_cand = max(cand_probs.items(), key=operator.itemgetter(1))[0]
+    # DEBUG:
+    print("The most likely candidate is: ", most_likely_cand)
     return most_likely_cand
 
 if __name__ == "__main__":
-    # single cases analyzer:
-    # sentence = 'KH2002 jest bronią samoczynno-samopowtarzalną działającą na zasadzie odprowadzania gazów prochowych rzez boczny otwór lufy, strzelającą z zamka zamkniętego.'
-    # error = 'rzez'
+    # # single cases analyzer:
+    # sentence = 'Pięciobój zimowy (odmiana Pięcioboju nowoczesnego, sport pokazowy) Skeleton (sport powacający do programu IO po 20 latach)'
+    # error = 'powacający'
     # print("The error is: {}".format(error))
     # print("Sentence with error: {}".format(sentence))
-    # print(correct_mistake(sentence, error, use_bigrams=False))
+    # print(correct_mistake(sentence, error, use_bigrams=True))
 
 
     # import test dataset
@@ -404,5 +418,5 @@ if __name__ == "__main__":
     test_df['unigram_case'] = unigram_case_results
     test_df['bigram_case'] = bigram_case_results
 
-    file_to_save = 'test_set_with_answers_no_lang_error_scaling_{}_lambda'.format(str(sys.argv[1])) + '.csv'
+    file_to_save = './results/test_set_with_answers_no_lang_error_scaling_{}_lambda'.format(str(sys.argv[1])) + '.csv'
     test_df.to_csv(file_to_save)
