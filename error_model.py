@@ -430,8 +430,8 @@ if __name__ == "__main__":
     print("Sentence with error: {}".format(sentence))
     print(correct_mistake(sentence, error, use_bigrams=True))
 
-    print("Uni_row: ", rows_list_uni)
-    print("Bi_row: ", rows_list_bi)
+    # print("Uni_row: ", rows_list_uni)
+    # print("Bi_row: ", rows_list_bi)
 
     ### TODO: dać całą ramkę i później wybrać tam, gdzie op/chars < 1
 
