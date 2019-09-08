@@ -88,19 +88,13 @@ def compute_channel_model_prob(observed, candidate):
     Based on the count of two adjacent characters estimate conditional
     probability P(observed|candidate).
     """
-    # DEBUG:
-    print("###### Observation {} and candidate {} are considered ##########".format(observed, candidate))
 
     # get one of the four basic operations that are needed to turn the candidate
     # into the observation
     # nums refer to the index of letters that are vital for the
     # operation
     operation, *nums = get_basic_operations(candidate, observed)[0]
-    # DEBUG:
-    # uni_row.append(operation)
-    # bi_row.append(operation)
-    # DEBUG:
-    print("Operation is: {}".format(operation))
+
     # choose one of the matrices accordingly
     if operation == 'delete':
         # if the letter of interest is the first one
@@ -121,27 +115,13 @@ def compute_channel_model_prob(observed, candidate):
         row, col = candidate[nums[1]], candidate[nums[0]]
         nominator = rev_matrix[col][row]
 
-    # debugging
     try:
-        # DEBUG:
-        print("row: {}, col: {}".format(row, col))
-        print("Nominator is: {}".format(nominator))
-        print("Chars count is {}".format(chars_matrix[col][row]))
-        # DEBUG:
-        # uni_row.append(nominator)
-        # uni_row.append(chars_matrix[col][row])
-        #
-        # bi_row.append(nominator)
-        # bi_row.append(chars_matrix[col][row])
         return (nominator / chars_matrix[col][row], operation, nominator, chars_matrix[col][row])
     except:
-        print("Col: ", col)
-        print("Row: ", row)
+        pass
 
-# # DEBUG:
-# lambda_coef is 0.75 by default and not parametrised
 def compute_language_model_prob(word, antecedent=None, after=None, \
-                                    lambda_coef=float(sys.argv[1])):
+                                    lambda_coef=0.75):
 
     """
     Given a word compute a (by default) a unigram probability.
@@ -158,82 +138,41 @@ def compute_language_model_prob(word, antecedent=None, after=None, \
     # a weight that indicates importance of unigram model in bigram
     # probability estimation
 
-    # DEBUG:
-    print("#### I'm considering: {}".format(word))
-
     if antecedent and after:
-        # DEBUG:
-        print("Word before is: {}".format(antecedent))
-        print("Word after is: {}".format(after))
         try:
             bigram_part = lambda_coef*two_gram_probs[antecedent][word]
-            # DEBUG:
-            print("Bigram1 prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
-            # DEBUG:
-            print("Bigram1 prob not found: {}".format(bigram_part))
 
         prob1 = bigram_part + (1-lambda_coef)*one_gram_dict_probs[antecedent]
-        # DEBUG:
-        print("Prob1: {}".format(prob1))
 
         try:
             bigram_part = lambda_coef*two_gram_probs[word][after]
-            # DEBUG:
-            print("Bigram2 prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
-            # DEBUG:
-            print("Bigram2 prob not found {}".format(bigram_part))
 
         prob2 = bigram_part + (1-lambda_coef)*one_gram_dict_probs[word]
-        # DEBUG:
-        print("Prob2: {}".format(prob2))
 
         prob = np.exp(np.log(prob1) + np.log(prob2))
-        # DEBUG:
-        print("Prob_lang_final: {}".format(prob))
 
     elif antecedent:
-        # DEBUG:
-        print("Word before is: {}".format(antecedent))
         try:
             bigram_part = lambda_coef*two_gram_probs[antecedent][word]
-            # DEBUG:
-            print("Bigram prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
-            # DEBUG:
-            print("Bigram prob not found: {}".format(bigram_part))
 
         prob =  bigram_part + (1-lambda_coef)*one_gram_dict_probs[antecedent]
-        # DEBUG:
-        print("Prob_lang_final: {}".format(prob))
 
     elif after:
-        # DEBUG:
-        print("Word after is: {}".format(after))
         try:
             bigram_part = lambda_coef*two_gram_probs[word][after]
-            # # DEBUG:
-            print("Bigram prob found: {}".format(bigram_part))
         except:
             bigram_part = 0
-            # # DEBUG:
-            print("Bigram prob not found: {}".format(bigram_part))
 
         prob =  bigram_part + (1-lambda_coef)*one_gram_dict_probs[word]
-        # DEBUG:
-        print("Prob_lang_final: {}".format(prob))
 
     else:
-        # unigram case
-        # # DEBUG:
-        print("Unigram case")
         prob = one_gram_dict_probs[word]
-        # DEBUG:
-        print("Prob_lang_final: {}".format(prob))
 
     return prob
 
@@ -272,29 +211,11 @@ def correct_mistake(sentence, error, use_bigrams=False):
         # error (channel) model is the same irrespective of the usage of bigrams
         # error is the observation
 
-        # DEBUG:
-        uni_row, bi_row = list(), list()
-        print("Rows initialised!")
-        uni_row.append(error)
-        bi_row.append(error)
-        uni_row.append(cand)
-        bi_row.append(cand)
-        print("CANDIDATE: ", cand)
 
         error_model_prob = compute_channel_model_prob(error, cand)[0]
-        # DEBUG:
-        uni_row.append(compute_channel_model_prob(error, cand)[1]) #operatoin
-        uni_row.append(compute_channel_model_prob(error, cand)[2]) #nominator
-        uni_row.append(compute_channel_model_prob(error, cand)[3]) #denominator
-        bi_row.append(compute_channel_model_prob(error, cand)[1]) #operatoin
-        bi_row.append(compute_channel_model_prob(error, cand)[2]) #nominator
-        bi_row.append(compute_channel_model_prob(error, cand)[3]) #denominator
+
         cand_probs[cand] = error_model_prob
 
-        # DEBUG:
-        uni_row.append(error_model_prob)
-        bi_row.append(error_model_prob)
-        rows_list_bi.append(bi_row)
     # it may be the case that the sentence such as
     # ! '5: 254, 267 1877 - muszkatałowce'
     # will be transformed into 'muszkatałowce' and no bigram analysis
@@ -302,8 +223,6 @@ def correct_mistake(sentence, error, use_bigrams=False):
     # analysed sentence is at least two-word long
 
     if use_bigrams and len(clean_tokens) > 1:
-        # DEBUG:
-        print("Bigram mode")
         # Depending on the error's position in the sentence one of three
         # situations can occur:
         # 1. The error has an antecedent as well as a word after.
@@ -324,76 +243,36 @@ def correct_mistake(sentence, error, use_bigrams=False):
             return None
 
         for cand, error_model_prob in cand_probs.items():
-            # DEBUG:
-            print("<<<<This is the candidate (before language model): ", cand)
             if error_location == 0:
                 # second case
-                # DEBUG:
-                print("Second case")
+
                 language_model_prob =\
                  compute_language_model_prob(cand,
                                 after=clean_tokens[error_location+1])
-                # DEBUG:
-                # bi_row.append(None) # ante
-                # bi_row.append(clean_tokens[error_location+1]) #after
 
             elif error_location == len(clean_tokens)-1:
                 # third case
-                # DEBUG:
-                print("Third case")
                 language_model_prob =\
                  compute_language_model_prob(cand,
                                     antecedent=clean_tokens[error_location-1])
 
-                # DEBUG:
-                # bi_row.append(clean_tokens[error_location-1]) # ante
-                # bi_row.append(None) # after
-
             else:
                 # first case
-                # DEBUG:
-                print("First case")
                 language_model_prob = \
                     compute_language_model_prob(cand,
                                     antecedent=clean_tokens[error_location-1],
                                     after=clean_tokens[error_location+1])
 
-                # DEBUG:
-                # bi_row.append(clean_tokens[error_location-1]) #ante
-                # bi_row.append(clean_tokens[error_location+1]) #after
-
-            # DEBUG:
-            print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
-
-            # DEBUG:
-            # bi_row.append(language_model_prob*1000000)
-            # DEBUG:
-            print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
-
             channel_model_prob = np.exp(np.log(error_model_prob) \
                                             + np.log(language_model_prob))
 
-            # bi_row.append(channel_model_prob*1000000)
 
             cand_probs[cand] = channel_model_prob
-            # DEBUG:
 
-            ## DEBUG:
-            print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
-            # print("Dołączam: ", bi_row[1])
-            # rows_list_bi.append(bi_row)
     else:
-        # DEBUG:
-        print("Unigram mode")
-        print("Probs are scaled 1000000")
         for cand, error_model_prob in cand_probs.items():
             try:
                 language_model_prob = one_gram_dict_probs[cand]
-                # DEBUG:
-                print("Language model prob for candidate {} is {}".format(cand, language_model_prob*1000000))
-
-                # DEBUG:
-                uni_row.append(language_model_prob*1000000)
             except NameError:
                 pass
 
@@ -403,22 +282,11 @@ def correct_mistake(sentence, error, use_bigrams=False):
             channel_model_prob = np.exp(np.log(error_model_prob) \
                                         + np.log(language_model_prob))
 
-            # DEBUG:
-            uni_row.append(channel_model_prob*1000000)
-            rows_list_uni.append(uni_row)
-            # DEBUG:
-            print("Error model prob for candidate {} is {}".format(cand, error_model_prob*1000000))
-
             cand_probs[cand] = channel_model_prob
-            ## DEBUG:
-            print("Channel model prob for candidate {} is {}".format(cand, channel_model_prob*10**12))
 
     # return the candidate that has the highest probability
-    # return max(cand_probs.items(), key=operator.itemgetter(1))[0]
-    # debugging:
+
     most_likely_cand = max(cand_probs.items(), key=operator.itemgetter(1))[0]
-    # DEBUG:
-    print("The most likely candidate is: ", most_likely_cand)
 
     return most_likely_cand
 
@@ -428,12 +296,7 @@ if __name__ == "__main__":
     error = 'powacający'
     print("The error is: {}".format(error))
     print("Sentence with error: {}".format(sentence))
-    print(correct_mistake(sentence, error, use_bigrams=True))
-
-    # print("Uni_row: ", rows_list_uni)
-    # print("Bi_row: ", rows_list_bi)
-
-    ### TODO: dać całą ramkę i później wybrać tam, gdzie op/chars < 1
+    print(correct_mistake(sentence, error, use_bigrams=False))
 
 
     # # import test dataset
